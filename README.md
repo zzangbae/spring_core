@@ -68,7 +68,7 @@
 
 ### 스프링 핵심 원리 이해2 - 객체 지향 원리 적용
 
-| 위의 예제에서 나타난 문제를 확인해보고, 스프링이 등장하게 된 배경을 파악하는 것이 목표
+>  위의 예제에서 나타난 문제를 확인해보고, 스프링이 등장하게 된 배경을 파악하는 것이 목표
 
 => 우선, 결론은 AppConfig라는 '설정 클래스'를 만들어서 각 클래스에서 활용되는 의존 객체를 주입해줌을 통해서 DIP, SRP, OCP를 구현하였다.
 
@@ -231,8 +231,6 @@
 
 **IoC 컨테이너, DI 컨테이너**
 
-**IoC 컨테이너, DI 컨테이너**
-
 * 우리는 위에서 AppConfig클래스를 보았다.
 
 * 객체를 생성하고 관리하며 의존관계를 연결해주는 것을 의미한다.
@@ -243,6 +241,93 @@
 
 * 어셈블러라고도 불림 -> 구현체를 가져와서 조립하기 때문에
 * 오브젝트 팩토리 라고도 불림 -> 인스턴스를 생성해서 주입하는 곳이므로
+
+
+
+**스프링 적용**
+
+* 아래 코드는 AppConfig에 스프링 기반으로 변경한 것이다.
+
+  ```java
+  // IoC컨테이너 혹은 DI 컨테이너
+  @Configuration	// 해당 클래스에 설정을 구성한다는 뜻
+  public class AppConfig {
+  
+      @Bean	// 각 메서드에 붙여줌 -> 스프링 컨테이너에 스프링 빈으로 등록됨
+      public MemberService memberService() {
+          return new MemberServiceImpl(memberRepository());
+      }
+  
+      @Bean
+      public OrderService orderService() {
+          return new OrderServiceImpl(
+                  memberRepository(),
+                  discountPolicy());
+      }
+  
+      @Bean
+      public MemberRepository memberRepository() {
+          return new MemoryMemberRepository();
+      }
+  
+      @Bean
+      public DiscountPolicy discountPolicy() {
+          return new RateDiscountPolicy();
+      }
+  }
+  ```
+
+* 이제 스프링 컨테이너를 MemberApp, OrderApp에 적용
+
+  ```java
+  public class MemberApp {
+      public static void main(String[] args) {
+  			
+          ApplicationContext applicationContext = new AnnotationConfigApplicationContext(AppConfig.class);
+          MemberService memberService = applicationContext.getBean("memberService", MemberService.class);
+  
+          Member member = new Member(1L, "memberA", Grade.VIP);
+          memberService.join(member);
+  
+          Member findMember = memberService.findMember(1L);
+          System.out.println("new member = " + member.getName());
+          System.out.println("find member = " + findMember.getName());
+  
+      }
+  }
+  ```
+
+  * `ApplicationContext` : 스프링 컨테이너
+
+  * 기존에는 개발자가 직접 AppConfig를 만들고 구성하여 DI를 했지만, 이제 스프링 컨테이너를 통해서 함
+
+  * `@Configuration` : 해당 클래스를 설정 정보로 사용
+
+  * `@Bean` : 스프링 컨테이너에 해당 어노테이션이 붙은 메서드를 모두 호출하여 반환한 객체를 스프링 컨테이너에 등록
+
+    -> 이렇게 스프링 컨테이너에 등록된 객체를 **스프링 빈**이라고 함
+
+    -> 스프링 빈은 `@Bean`이 붙은 메서드 명을 스프링 빈의 이름으로 사용
+
+  * 이제 AppConfig에서 조회하는 것이 아닌, ApplicationContext의 인스턴스에 `.getBean()`메서드를 통해서 접근
+
+    ```java
+    MemberService memberService = applicationContext.getBean("memberService", MemberService.class);	// 메서드(빈 이름, 반환 클래스)
+    ```
+
+  => 복잡해진 것 같다. 그래도 왜 쓰는 걸까? : 이것을 앞으로 공부해볼 예정
+
+>  **정리**
+>
+> 1. 자바를 통해서 다형성에 맞춰서 애플리케이션을 만들어보았다. -> DIP, OCP 부족으로 객체지향의 장점을 이용할 수 없음
+>
+> 2. AppConfig의 도입으로 구성 영역과 사용 영역을 나눴다. -> DIP, OCP, SRP 만족
+>
+>    -> 이는 스프링이 나오게 된 계기. DI 컨테이너이자, 앞으로 스프링이 적용되어 스프링 컨테이너로 발전
+>
+> 3. 모든 프로젝트에 적용 가능한 프레임워크의 도입. Spring
+>
+> 4. 앞으로는 Spring 컨테이너를 통해서 얻게 될 장점을 알아볼 것이다.
 
 
 
