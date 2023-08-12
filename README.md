@@ -333,6 +333,60 @@
 
 ### 스프링 컨테이너와 스프링 빈
 
+> 앞선 단원에서 AppConfig의 등장 배경과 스프링을 통해서 AppConfig를 기반으로 스프링 컨테이너를 생성해보았다.
+>
+> 이제, 스프링 컨테이너와 그 안에 의존관계를 만들어주기 위해서 만드는 스프링 빈에 대해서 정리해보겠다.
+
+**스프링 컨테이너**
+
+* 아래의 코드를 통해서 우리는 `AppConfig`라는 설정 클래스를 기반으로 스프링 컨테이너를 생성했다.
+
+  ```java
+  // 스프링 컨테이너 생성
+  ApplicationContext applicationContext = new AnnotationConfigApplicationContext(AppConfig.class);
+  ```
+
+* ApplicationContext
+
+  * 스프링 컨테이너이다.
+  * ApplicationContext는 인터페이스이다. -> 위에서 했던 것처럼 `@Configuration` 애노테이션 기반으로 스프링 컨테이너를 만들거나 XML 문서를 기반으로 만들 수 있다.
+  * 스프링 컨테이너 생성의 예시는 애노테이션 기반으로 만든 스프링 컨테이너인데, `AnnotationConfigApplicationContext` 이름을 통해서 알 수 있다. 또한, 이는 `ApplicationContext`의 구현체이다.
+
+**스프링 컨테이너 생성 과정**
+
+1. AppConfig.class를 기반으로(구성정보로 하여) 스프링 컨테이너 생성![스크린샷 2023-08-12 오후 11.35.48](/Users/changbae/Library/Application Support/typora-user-images/스크린샷 2023-08-12 오후 11.35.48.png)
+2. `@Bean` 애노테이션을 찾아서, <u>해당 메서드명을 빈 이름으로, 반환받은 객체를 빈 객체로</u>한 빈을 만들어 빈 저장소에 등록한다.(위의 그림의 빈 칸을 채운다 생각하자)
+   * 이 때, 빈 이름은 `@Bean(name="anotherName")` 을 통해서 다른 이름으로 만들 수 있다.
+   * 주의 - <u>빈 이름은 항상 다른 이름을 부여해야한다!</u>
+
+3. 빈 의존 관계 설정
+
+   * 설정 정보를 기반으로 의존관계를 주입한다.(DI; Dependency Injection)
+   * 동적인 객체의존 관계를 스프링이 연결해주는 것이라 생각하자.(객체의 reference연결)
+   * 자바 코드를 호출하는 것 같지만, 의존 관계연결은 그와 차이가 있다. -> 싱글톤 컨테이너에 정리할 예정
+
+   => 실제로는 빈 생성하고 의존관계 주입하는 단계가 나누어져 있지만, 실제로는 호출하면서 의존관계 주입도 한 번에 처리
+
+> 스프링 컨테이너를 생성하고, 스프링 빈을 저장하는 과정까지 정리했다.
+>
+> 그러면 이제, 저장한 스프링 빈을 확인하는 방법에 대해서 정리해보겠다.
+
+스프링 빈 조회
+
+
+
+스프링 빈 조회 - 상속 관계
+
+
+
+BeanFactory & ApplicationContext
+
+
+
+BeanDefinition : 스프링 빈 설정 메타 정보
+
+
+
 
 
 ### 싱글톤 컨테이너
