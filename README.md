@@ -371,21 +371,198 @@
 >
 > 그러면 이제, 저장한 스프링 빈을 확인하는 방법에 대해서 정리해보겠다.
 
-스프링 빈 조회
+**스프링 빈 조회**
 
+* `getBean()`
 
+  * `ac.getBean(빈 이름, 타입)` : 빈이름(key)으로부터 빈을 찾아 매개변수의 인자에 지정된 타입으로 빈 객체 반환
+  * `ac.getBean(타입)` : 해당 타입의 빈을 찾아서 반환
+    * 동일한 타입이 둘 이상일 때, 에러 발생 -> 빈 이름으로 지정해서 찾는다.
+    * 에러 : `NoSuchBeanDefinitionException: No bean named 'xxxxx' available`
+  * -> 조회 대상 타입 없을 시, 예외 발생
 
-스프링 빈 조회 - 상속 관계
+* `getBeansOfType()`
 
+  * `ac.getBeansOfType(타입)` : 매개변수의 인자로 들어온 타입의 모든 빈 객체를 반환
 
+* 상속관계에서의 조회
 
-BeanFactory & ApplicationContext
+  * 부모 타입으로 조회시, 자식이 둘 이상 있으면, 중복 오류 -> 빈 이름으로 지정해서 찾는다
+  * 특정하위 타입으로 지정해서 찾을 수도 있지만, 비추 -> "구체화에 의존하지 말라"
+  * 부모 타입으로 모두 조회하게 되면(getBeansOfType()), 자식 객체가 모두 나옴. 특히 Object타입으로 조회 시, 스프링 빈에 등록된 모든 객체가 반환되게 된다. -> Object는 모든 클래스의 상위 클래스
 
+* 예시
 
+  ```java
+  // 스프링 컨테이너 생성
+  ApplicationContext ac = new AnnotationConfigApplicationContext(AppConfig.class);
+  
+  // ac.getBean(빈 이름, 타입)
+  MemberService memberService = ac.getBean("memberService", MemberService.class);
+  
+  // ac.getBean(타입)
+  MemberService memberService = ac.getBean(MemberService.class);
+  
+  // ac.getBeansOfType(타입) : key, value 꼴이기 때문에, Map구조로 받는다.
+  Map<String, Object> beansOfType = ac.getBeansOfType(Object.class);
+  
+  // 아래는 키값을 순회하면서 해당하는 빈 객체를 출력
+  for(String key : beansOfType.keySet()) {
+      System.out.println("key = " + key + " value = " + beansOfType.get(key));
+  }
+  ```
 
-BeanDefinition : 스프링 빈 설정 메타 정보
+* 모든 빈 출력
 
+  ```java
+  // 스프링 빈 이름을 모두 가져오기
+  String[] beanDefinitionNames = ac.getBeanDefinitionNames();
+  // 하나씩 순회
+  for (String beanDefinitionName : beanDefinitionNames) {
+      Object bean = ac.getBean(beanDefinitionName);
+      System.out.println("name=" + beanDefinitionName + " object=" + bean);
+  }
+  ```
 
+  * `ac.getBeanDefinitionNames()` : 스프링에 등록된 모든 빈 이름을 조회
+  * 결과적으로 빈 이름을 조회하고, 하나씩 순회하며 `ac.getBean()`을 통해서 객체를 찾고 출력
+
+**BeanFactory & ApplicationContext**
+
+* BeanFactory는 스프링 컨테이너의 최상위 인터페이스이자, 스프링 빈을 관리하고 조회하는 역할
+
+* `getBean()` 제공
+
+* ApplicationContext는 BeanFactory 기능을 모두 상속 받음. + 부가적인 기능을 추가함
+
+  * ApplicationContext는 BeanFactory 기능을 상속받으면서 MessageSource, EnvironmentCapable, ApplicationEventPublisher, ResourceLoader을 상속받는다.
+    * 일 예로, getBeansOfType() 메서드의 경우, ResourceLoader로부터 상속받은 다른 추상 클래스에 있는 메서드로, BeanFactory로 스프링 컨테이너를 생성 시, 테스트되지 않는 예제가 존재한다.
+  * 부가기능
+    * 메시지 소스를 활용한 국제화 기능
+    * 환경 변수
+    * 애플리케이션 이벤트
+    * 편리한 리소스 조회
+
+* BeanFactory, ApplicationContext 둘 다, 스프링 컨테이너다. 단지, 실제로 ApplicationContext를 주로 사용(부가 기능이 애플리케이션 제작에 거의 필수이기 때문에)
+
+  ![스크린샷 2023-08-13 오전 12.27.13](/Users/changbae/Library/Application Support/typora-user-images/스크린샷 2023-08-13 오전 12.27.13.png)
+
+**다양한 설정 형식 지원 - 자바코드, XML**
+
+* 우리는 자바코드(AppConfig.class)를 통해서 설정을 하였다.
+
+* 옛날 코드의 경우 XML을 통해서 설정정보를 만드는 경우가 많았다.
+
+* `AnnotationCofigApplicationContext`, `GenericXmlApplicationContext`는 ApplicationContext를 상속받은 것이고, 각각 자바코드를 기반으로 설정 정보를 사용하거나 XML문서를 설정 정보로 활용한다.
+
+* XML로 설정정보를 쓸 경우, 컴파일 없이 파일만 변경하면 빈 설정 정보를 변경할 수 있다는 장점이 있으나, 자바가 쓰기 더 편해서인지, 오늘날에는 자바 코드로 빈 설정정보를 설정하는 것이 대세이다.
+
+* 아래는 XML파일을 통해서 설정정보를 만드는 예시이고, XML파일을 보면 AppConfig클래스와 굉장히 유사하다는 것을 확인할 수 있다.
+
+  * xml파일 - 참고로, xml파일같이 자바가 아닌 코드는 resources에 해당 파일을 위치시킨다.
+
+  ```xml
+  <?xml version="1.0" encoding="UTF-8"?>
+  <beans xmlns="http://www.springframework.org/schema/beans"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+  
+      <bean id="memberService" class="hello.core.member.MemberServiceImpl">
+          <constructor-arg name="memberRepository" ref="memberRepository"/>
+      </bean>
+  
+      <bean id="memberRepository" class="hello.core.member.MemoryMemberRepository"/>
+  
+      <bean id="orderService" class="hello.core.Order.OrderServiceImpl">
+          <constructor-arg name="memberRepository" ref="memberRepository"/>
+          <constructor-arg name="discountPolicy" ref="discountPolicy"/>
+      </bean>
+  
+      <bean id="discountPolicy" class="hello.core.discount.RateDiscountPolicy"/>
+  </beans>
+  ```
+
+  * xml을 기반으로 한 설정 파일 테스트
+
+  ```java
+  class XmlAppContext {
+  
+      @Test
+      void xmlAppContext() {
+          // 클래스 파일이 xml
+          ApplicationContext ac = new GenericXmlApplicationContext("appConfig.xml");
+          MemberService memberService = ac.getBean("memberService", MemberService.class);
+          assertThat(memberService).isInstanceOf(MemberService.class);
+      }
+  }
+  ```
+
+![스크린샷 2023-08-13 오전 12.26.40](/Users/changbae/Library/Application Support/typora-user-images/스크린샷 2023-08-13 오전 12.26.40.png)
+
+**BeanDefinition : 스프링 빈 설정 메타 정보**
+
+* BeanDefinition : 설정 메타 정보 - 설정에 관한 여러 정보들을 알려주는 것
+  * @Bean, <bean> 하나 당 메타 정보가 생성된다.
+* BeanDefinition이라는 추상화 - 스프링이 위와 같이 다양한 설정 형식을 지원하도록 한다.
+* 이 것 또한 마찬가지로 역할과 구현을 개념적으로 나눴다.
+* 스프링 컨테이너가 오직 BeanDefinition만 알고, 자바코드인지, XML인지 몰라도 된다. 즉, BeanDefinition 인터페이스에 맞게만 코드가 짜여졌다면, 스프링 컨테이너에 설정정보로 추가할 수가 있다.(표준화)
+* 스프링 컨테이너는 이 메타정보를 기반으로 스프링 빈을 생성
+
+![스크린샷 2023-08-13 오전 12.31.01](/Users/changbae/Library/Application Support/typora-user-images/스크린샷 2023-08-13 오전 12.31.01.png)
+
+* BeanDefinition에는 다양한 정보들이 있다.
+
+  * BeanClassName, factoryBenName, Scope 등.
+  * 이 정보를 바탕으로 스프링 컨테이너가 빈을 생성하는 것
+
+* 아래는 빈 설정 메타 정보를 확인하는 코드다.
+
+  ```java
+  // 빈 이름을 받고, String으로 이루어진 배열에 저장
+  String[] beanDefinitionNames = ac.getBeanDefinitionNames();
+  // 빈 이름을 순회하며 설정 정보를 통해서 만든 빈을 경우, 빈 정보를 출력하도록 함
+  for(String beanDefinitionName : beanDefinitionNames) {
+      BeanDefinition beanDefinition = ac.getBeanDefinition(beanDefinitionName);
+  
+      if(beanDefinition.getRole() == BeanDefinition.ROLE_APPLICATION) {
+          System.out.println("beanDefinitionName = " + beanDefinitionName + " beanDefinition = " + beanDefinition);
+      }
+  }
+  /**
+  아래는 결과
+  beanDefinitionName = memberService beanDefinition = Generic bean: class [hello.core.member.MemberServiceImpl]; scope=; abstract=false; lazyInit=false; autowireMode=0; dependencyCheck=0; autowireCandidate=true; primary=false; factoryBeanName=null; factoryMethodName=null; initMethodName=null; destroyMethodName=null; defined in class path resource [appConfig.xml]
+  
+  beanDefinitionName = memberRepository beanDefinition = Generic bean: class [hello.core.member.MemoryMemberRepository]; scope=; abstract=false; lazyInit=false; autowireMode=0; dependencyCheck=0; autowireCandidate=true; primary=false; factoryBeanName=null; factoryMethodName=null; initMethodName=null; destroyMethodName=null; defined in class path resource [appConfig.xml]
+  
+  beanDefinitionName = orderService beanDefinition = Generic bean: class [hello.core.Order.OrderServiceImpl]; scope=; abstract=false; lazyInit=false; autowireMode=0; dependencyCheck=0; autowireCandidate=true; primary=false; factoryBeanName=null; factoryMethodName=null; initMethodName=null; destroyMethodName=null; defined in class path resource [appConfig.xml]
+  
+  beanDefinitionName = discountPolicy beanDefinition = Generic bean: class [hello.core.discount.RateDiscountPolicy]; scope=; abstract=false; lazyInit=false; autowireMode=0; dependencyCheck=0; autowireCandidate=true; primary=false; factoryBeanName=null; factoryMethodName=null; initMethodName=null; destroyMethodName=null; defined in class path resource [appConfig.xml]
+  */
+  ```
+
+> 스프링이 XML, 자바 코드 등의 다양한 형태의 설정 정보를 BeanDefinition으로 추상화해서 사용하는 것
+
+> 정리
+>
+> 1. AppConfig라는 설정정보를 바탕으로 스프링 컨테이너를 생성했다. -> 이 과정에 대한 배경을 파악
+>
+>    * @Configuration 애노테이션을 통해서 해당 클래스를 바탕으로 스프링 컨테이너로 만들고자 했음
+>    * @Bean 애노테이션 바탕으로 해당 메서드가 빈 정보임을 알림
+>    * ApplicationContext 인터페이스, new AnnotationConfigApplicationContext(AppConfig.class); 를 통해서 스프링 컨테이너 생성
+>
+> 2. 스프링 빈이 생성되는 방법을 파악하고 조회하는 방법을 공부함
+>
+>    * 실제로는 조회는 잘하지 않는다고 한다.
+>
+> 3. BeanFactory와 ApplicationContext가 스프링 컨테이너이며, 어떤 차이점이 있는지 파악하였다.
+>
+>    * BeanFactory는 빈 관리 기능을 가지고 있음
+>
+>    * ApplicationContext는 BeanFactory뿐만 아니라 다른 인터페이스에서 추가적으로 상속을 받아 국제화, 환경변수, 애플리케이션 이벤트, 리소스 조회 등의 추가적인 기능을 가짐
+>
+> 4. 다양한 설정 파일(자바 코드, XML)을 통해서 스프링 컨테이너에 설정 정보를 생성할 수 있음을 파악하였다.
+>
+> 5. BeanDefinition을 통해서 스프링 컨테이너가 빈 메타 정보를 바탕으로 스프링 빈을 생성함을 확인할 수 있었다.
 
 
 

@@ -6,6 +6,7 @@ import hello.core.discount.RateDiscountPolicy;
 import net.bytebuddy.utility.dispatcher.JavaDispatcher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.NoUniqueBeanDefinitionException;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ApplicationContextExtendsFIndTest {
     AnnotationConfigApplicationContext ac = new AnnotationConfigApplicationContext(TestConfig.class);
+//    BeanFactory ac = new AnnotationConfigApplicationContext(TestConfig.class);
 
     @Test
     @DisplayName("부토 타입으로 조회시, 자식이 둘 이상 있으면, 중복 오류가 발생한다.")
