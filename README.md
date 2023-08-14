@@ -669,15 +669,133 @@
   * DIP, OCP, 테스트, private 생성자로부터 자유롭게 싱글톤을 사용할 수 있다.
 * 스프링 빈이 싱글톤으로 관리되는 빈이다.
 
-싱글톤 방식의 주의점
+**싱글톤 방식의 주의점**
 
+* 싱글톤 방식은 여러 클라이언트가 하나의 같은 객체 인스턴스를 공유하기 때문에 싱글톤 객체는 상태를 유지(stateful)하게 설계하면 안된다.
 
+* **무상태(stateless)로 설계해야 한다!**
 
-@Configuration과 싱글톤
+  * 특정 클라이언트에 의존적인 필드가 있으면 안된다.
+  * 특정 클라이언트가 값을 변경할 수 있는 필드가 있으면 안된다.
+  * 가급적 읽기만 가능해야 한다.
+  * 필드 대신 자바에서 공유되지 않는 지역변수, 파라미터, ThreadLocal 등을 사용해야 한다.
+
+* 스프링 빈의 필드에 공유 값을 설정하면 정말 큰 장애가 발생할 수 있다!!!!
+
+* 문제점 예시(상태를 유지하는 서비스와 테스트)
+
+  ```java
+  public class StatefulService {
+    private int price;	// 상태를 유지하는 필드
+    public void order(String name, int price) {
+      System.out.println("name = " + name + " price = " + price);
+      this.price = price;	// -> 이 부분이 문제를 일으킨다.
+    }
+    
+    public int getPrice() {
+      return price;
+    }
+  }
+  ```
+
+  ```java
+  public class StatefulServiceTest {
+    @Test
+    void statefulServiceSingleton() {
+      ApplicationContext ac = new AnnotationConfigApplicationContext(TestConfig.class);
+      StatefulService statefulService1 = ac.getBean("statefulService", StatefulService.class);
+      StatefulService statefulService2 = ac.getBean("statefulService", StatefulService.class);
+      
+  		// 사용자A는 1만 주문, 사용자 B는 2만 주문
+      statefulService1.order("userA", 10000);
+      statefulService2.order("userB", 20000);
+      
+      // 사용자A 주문 금액 조회
+      int price = statefulService1.getPrice();
+      System.out.println("price = " + price);	// 10000을 기대했으나 20000이 나옴
+      
+      Assertions.assetThat(statefulService1.getPrice()).isEqualTo(20000);
+    }
+    
+    static class TestConfig {
+      @Bean
+      public StatefulService statefulService() {
+        return new StatefulService();
+      }
+    }
+  }
+  ```
+
+  * A, B가 각각 다른 금액 주문했는데, A의 주문 가격이 B의 주문 가격을 갱신되었음을 확인할 수 있다.
+
+    => 싱글톤이라  price 변수를 공유하고 있었다!
+
+* 그렇다면 위의 문제는 어떻게 해결할 수 있을까?
+
+  ```java
+  public class StatefulService {
+    // private int price;	// 상태를 유지하는 필드 -> 지우기
+    
+    public void order(String name, int price) {
+      return price;	// 주문 금액을 바로 반환
+    }
+  }
+  ```
+
+  ```java
+  public class StatefulServiceTest {
+    @Test
+    void statefulServiceSingleton() {
+      ApplicationContext ac = new AnnotationConfigApplicationContext(TestConfig.class);
+      StatefulService statefulService1 = ac.getBean("statefulService", StatefulService.class);
+      StatefulService statefulService2 = ac.getBean("statefulService", StatefulService.class);
+      
+  		// 사용자A는 1만 주문, 사용자 B는 2만 주문
+      int userAPirce = statefulService1.order("userA", 10000); // 해결: 지역변수로 받아서 저장
+      int userBPirce = statefulService2.order("userB", 20000);
+      
+      // 사용자A 주문 금액 조회
+      int price = statefulService1.getPrice();
+      System.out.println("userAPrice = " + userAPrice);
+      Assertions.assetThat(userAPrice).isEqualTo(10000);	// 정상적으로 10000나옴
+    }
+    
+    static class TestConfig {
+      @Bean
+      public StatefulService statefulService() {
+        return new StatefulService();
+      }
+    }
+  }
+  ```
+
+  * 싱글톤 서비스에서 상태를 유지하는 필드를 지워버린다.
+  * 그리고 사용할 값을 바로 반환
+  * 클라이언트 코드에선 해당 값을 지역변수에 받아 저장하고 사용하도록 한다.
+
+**@Configuration과 싱글톤**
 
 * 우리가 만들었던 AppConfig 코드를 다시보자
 
   ```java
+  @Configuration
+   public class AppConfig {
+       @Bean
+       public MemberService memberService() {
+           return new MemberServiceImpl(memberRepository());
+       }
+       @Bean
+       public OrderService orderService() {
+           return new OrderServiceImpl(
+                   memberRepository(),
+                   discountPolicy());
+  }
+       @Bean
+       public MemberRepository memberRepository() {
+           return new MemoryMemberRepository();
+       }
+  ... 
+   }
   ```
 
   * memberService 빈을 만드는 코드를 보면 memberRepository()를 호출한다. -> new MemoryMemberRepositroy()를 호출한다.
@@ -687,7 +805,82 @@
 
 * 우선 스프링 컨테이너가 정말 싱글톤이 맞는지, 검증 용도 코드를 추가하고 검증해보자
 
+  ```java
+  public class MemberServiceImpl implements MemberService {
+   
+   		private final MemberRepository memberRepository;
+  		//테스트 용도
+      public MemberRepository getMemberRepository() {
+              return memberRepository;
+      }
+  }
+  public class OrderServiceImpl implements OrderService {
+      private final MemberRepository memberRepository;
+      //테스트 용도
+      public MemberRepository getMemberRepository() {
+              return memberRepository;
+      }
+  }
+  ```
 
+* 테스트
+
+  ```java
+  public class ConfigurationSingletonTest {
+  
+      @Test
+      void configurationTest() {
+          ApplicationContext ac = new AnnotationConfigApplicationContext(AppConfig.class);
+  
+          MemberServiceImpl memberService = ac.getBean("memberService", MemberServiceImpl.class);
+          OrderServiceImpl orderService = ac.getBean("orderService", OrderServiceImpl.class);
+          MemberRepository memberRepository = ac.getBean("memberRepository", MemberRepository.class);
+  
+          // 모두 같은 인스턴스를 참고하고 있다.
+          System.out.println("memberService -> memberRepository = " + memberService.getMemberRepository());
+          System.out.println("orderService -> memberRepository = " + orderService.getMemberRepository());
+          System.out.println("memberRepository = " + memberRepository);
+  
+          // 모두 같은 인스턴스를 참고하고 있다.
+          assertThat(memberService.getMemberRepository()).isSameAs(memberRepository);
+          assertThat(orderService.getMemberRepository()).isSameAs(memberRepository);
+      }
+  }
+  ```
+
+* AppConfig에도 로그를 남겨보고 확인해보겠다.
+
+  ```java
+  @Configuration
+   public class AppConfig {
+       @Bean
+       public MemberService memberService() {
+          //1번
+          System.out.println("call AppConfig.memberService"); return new MemberServiceImpl(memberRepository());
+      }
+       @Bean
+       public OrderService orderService() {
+          //1번
+          System.out.println("call AppConfig.orderService"); return new OrderServiceImpl(
+                           memberRepository(),
+                           discountPolicy());
+      }
+       @Bean
+       public MemberRepository memberRepository() {
+          //2번? 3번?
+          System.out.println("call AppConfig.memberRepository"); return new MemoryMemberRepository();
+      }
+       @Bean
+       public DiscountPolicy discountPolicy() {
+           return new RateDiscountPolicy();
+       }
+  }
+  /** 결과
+  call AppConfig.memberService
+  call AppConfig.memberRepository
+  call AppConfig.orderService
+  */
+  ```
 
 > 스프링 컨테이너가 정말 싱글톤이 맞으며, 없는 빈은 호출하고, 이미 있을 경우 호출하지 않았음을 확인했다. 그렇다면 이제, 이것을 어떻게 구현해냈는지 알아보자
 
@@ -739,7 +932,13 @@
 
 * @Configuration을 삭제하게 되면 싱글톤이 깨지게 된다.
 
+​		=> 예상한대로 memberRepository가 3번 호출되게 된다.
 
+> 정리
+>
+> 1. 스프링 컨테이너는 싱글톤 레지스트리로서 싱글톤 패턴이 적용되도록 한다. => 바이트 코드 조작
+> 2. 스프링 빈 또한 싱글톤이다.
+> 3. 그냥 설정 클래스 위에 @Configuration을 사용해야함을 기억하자.
 
 ### 컴포넌트 스캔
 
