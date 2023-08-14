@@ -19,11 +19,13 @@ public class AppConfig {
     @Bean
     public MemberService memberService() {
         // return new MemberServiceImpl(new MemoryMemberRepository());
+        System.out.println("call AppConfig.memberService");
         return new MemberServiceImpl(memberRepository());
     }
 
     @Bean
     public OrderService orderService() {
+        System.out.println("call AppConfig.orderService");
         return new OrderServiceImpl(
                 // new MemoryMemberRepository(),
                 memberRepository(),
@@ -34,6 +36,7 @@ public class AppConfig {
     // -> "저장소는 메모리 저장소 구현체를 적용중이구나!" : 역할과 구현을 확인할 수 있음
     @Bean
     public MemberRepository memberRepository() {
+        System.out.println("call AppConfig.memberRepository");
         return new MemoryMemberRepository();
     }
 

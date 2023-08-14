@@ -568,6 +568,177 @@
 
 ### 싱글톤 컨테이너
 
+> 스프링이 등장한 배경은 기업용 온라인 서비스 기술 지원하기 위함에 있다.
+>
+> 따라서 이 배경이 가진 성격(다수의 고객이 다수의 요청)을 이해하고, 그렇기 위해서 스프링이 어떤 점(싱글톤 컨테이너)을 지원하는지를 파악해야한다.
+
+**웹 애플리케이션과 싱글톤**
+
+* 스프링 -> 기업용 온라인 서비스 기술 지원하기 위해서 탄생
+* 웹 애플리케이션을 주로 만드는데 사용 -> 웹 애플리케이션은 여러 고객이 동시에 요청을 함
+* 스프링 컨테이너 전에 우리가 만들었던 순수한 DI컨테이너(AppConfig)는 요청이 들어올 때마다 새로운 객체를 생성한다.
+* 따라서, 고객 트래픽이 초당 100이 나오면 초당 100개의 객체가 생성되고 소멸된다 -> 메모리 낭비가 심하다.
+* 이 문제를 해결하기 위해서 해당 객체를 딱 1개만 생성하고, 공유하도록 설계하는 "**싱글톤 패턴**"을 이용하면 된다.
+
+> 스프링이 적용하는 싱글톤을 공부하기 전에, 우선 싱글톤 패턴에 대해서 먼저 공부해보자
+
+**싱글톤 패턴**
+
+* 클래스의 인스턴스가 딱 1개만 생성되는 것을 보장하는 디자인 패턴
+
+* 객체 인스턴스를 2개 이상 생성하지 못하도록 막아야한다.
+
+  * private생성자 -> 외부에서 new 키워드를 사용하지 못하도록 막자
+  * 외부에서 접근하기 위한 메서드를 하나 마련한다.
+
+* 싱글톤 패턴을 구현하는 방식을 다양하다.
+
+  * 미리 하나를 만들고, 메서드를 통해서 접근하도록 하는 방식
+  * 요청이 들어올 때 하나를 만들고, 이미 객체가 있다면 그 객체에 접근하도록 하는 방식
+  * 등등
+
+* 싱글톤 패턴을 적용한 예제 코드
+
+  ```java
+  public class SingletonService {
+  	// 1. static 영역에 객체를 딱 1개만 생성
+    private static final SingletonService instance = new SingletonService();
+    
+    // 2. public으로 열어서 객체 인스턴스가 필요하면 아래의 메서드를 통해서 조회하도록 허용
+    public static SingletonService getInstance() {
+      return instance;
+    }
+    
+    // 3. 생성자를 private으로 선언 -> 외부에서 new 키워드를 통해서 접근하지 못하도록 함
+    private SingletonService() {
+    }
+    
+    public void login() {
+      System.out.println("싱글톤 객체 로직 호출");
+    }
+  }
+  ```
+
+  * 위의 패턴을 테스트 해보겠다.
+
+  ```java
+  @Test
+  @DisplayName("싱글톤 패턴을 적용한 객체 사용")
+  public void singletonServiceTest() {
+    // new SingletonService(); -> 컴파일 오류: 생성자를 private로 막아놓았기 때문
+    SingletonService singletonService1 = SingletonService.getInstance();
+    SingletonService singletonService2 = SingletonService.getInstance();
+    
+    // 테스트 전 참조값을 직접 찍어보자
+    System.out.println("singletonService1 = " + singletonService1);
+    System.out.println("singletonService2 = " + singletonService2);
+    
+    assertThat(singletonService1).isSameAs(singletonService2);	//테스트 통과
+  }
+  /** 결과
+  singletonService1 = hello.core.singleton.SingletonService@24269709
+  singletonService2 = hello.core.singleton.SingletonService@24269709
+  싱글톤 객체 로직 호출
+  
+  -> 참조값이 같음을 확인할 수 있다.
+  */
+  ```
+
+* 싱글톤 패턴 문제점
+  * 예제 코드를 보는 것처럼, 코드 자체가 많이 들어간다.
+  * 의존관계상 클라이언트가 구체 클래스에 의존한다. -> DIP위반
+    * 위의 코드를 보자. 클라이언트에서 SingletonService가 아닌, 해당 클래스로 만든 인스턴스를 직접 호출하여 의존하게 된다.
+  * 클라이언트가 구체 클래스에 의존해서 OCP 원칙을 위반할 가능성이 높다
+  * 테스트 하기 어렵다
+    * 싱글톤 패턴은 전역적으로 공유되는 인스턴스를 사용하기 때문에 테스트 간의 간선으로 결과를 예측하기가 어렵다.
+  * 내부 속성을 변경하거나 초기화 하기 어렵다.
+    * 어떤 상황에서 내부 속성을 재설정한다면, 해당 인스턴스를 쓰고 있는 다른 코드에 예상치 못한 문제를 야기할 수 있다.
+  * private 생성자로 자식 클래스를 만들기 어렵다.
+  * 결론적으로 유연성이 떨어진다.
+  * 안티패턴이라고도 불린다.
+
+> 싱글톤 패턴은 위와 같이 많은 단점을 지니고 있다. 싱글톤 컨테이너는 해당 문제를 해결하면서 싱글톤을 관리하도록 등장하였다.
+
+**싱글톤 컨테이너**
+
+* 스프링 컨테이너(싱글톤 컨테이너)는 싱글톤 패턴을 적용하지 않아도, 객체 인스턴스를 싱글톤으로 관리한다.
+* 스프링 컨테이너는 싱글톤 컨테이너로서 역할을 한다. -> 싱글톤 레지스트리(싱글톤 객체를 생성하고 관리)
+
+* 스프링 컨테이너의 이런 기능 덕분에 싱글톤 패턴의 모든 단점을 해결하면서 객체를 싱글톤으로 유지할 수 있다.
+  * 싱글톤을 위한 지저분한 코드가 들어가지 않아도 된다.
+  * DIP, OCP, 테스트, private 생성자로부터 자유롭게 싱글톤을 사용할 수 있다.
+* 스프링 빈이 싱글톤으로 관리되는 빈이다.
+
+싱글톤 방식의 주의점
+
+
+
+@Configuration과 싱글톤
+
+* 우리가 만들었던 AppConfig 코드를 다시보자
+
+  ```java
+  ```
+
+  * memberService 빈을 만드는 코드를 보면 memberRepository()를 호출한다. -> new MemoryMemberRepositroy()를 호출한다.
+  * orderService 빈을 만들 때에도 동일한 생성자를 호출한다.
+
+  => 결과적으로 각각 다른 2개의 MemoryMemberRepository가 생성되는 것으로 보인다. 즉, 싱글톤이 깨지는 것처럼 보인다. 스프링 컨테이너는 과연 정말 싱글톤이 맞는가? 맞다면, 이 문제를 싱글톤 컨테이너는 어떻게 해결할까
+
+* 우선 스프링 컨테이너가 정말 싱글톤이 맞는지, 검증 용도 코드를 추가하고 검증해보자
+
+
+
+> 스프링 컨테이너가 정말 싱글톤이 맞으며, 없는 빈은 호출하고, 이미 있을 경우 호출하지 않았음을 확인했다. 그렇다면 이제, 이것을 어떻게 구현해냈는지 알아보자
+
+**@Configuration과 바이트코드 조작의 마법**
+
+* cf) 바이트 코드는 JVM에서 자바실행프로그램에 의해 실제로 실행되는 코드를 의미한다.(.java -> .class -> 바이트코드)
+
+* 스프링 컨테이너는 싱글톤 레지스트리다. 따라서 스프링 빈이 싱글톤이 되도록 보장해야 한다. 하지만 자바 코드를 어떻게 하기는 어렵다. 위에서 보았던 MemoryMemberRepository()는 분명 3번 호출되는 것이 맞았다. 그래서 스프링은 클래스의 바이트코드를 조작하는 라이브러리를 사용한다.
+
+* 우리가 `AppConfig`에 올렸던 `@Configuration`에 정답이 있다.
+
+  ```java
+  @Test
+  void configurationDeep() {
+    AppicationContext ac = new AnnotationApplicationContext(AppConfig.class);
+    
+    // AppConfig도 스프링 빈으로 등록된다.
+    AppConfig bean = ac.getBean("appConfig", AppConfig.class);
+    
+    System.out.println("bean = " + bean.getClass());
+    // 출력: bean = class hello.core.AppConfig$$EnhancerBySpringCGLIB$$b8933e89
+  }
+  ```
+
+  * AppConfig도 스프링빈으로 등록됨을 확인했다.
+  * 그런데 클래스 정보가 이상하다. class hello.core.AppConfig 뒤에 뭐가 더 많이 붙어 있다.
+  * 이는 내가 만든 클래스가 아니라 스프링이 CGLIB라는 바이트 코드 조작을 사용하여 AppConfig 클래스를 상속받은 임의의 다른 클래스를 만들고, 그 다른 클래스를 스프링 빈으로 등록한 것이다.
+  * 즉, 자바에서 클래스 파일을 만들고 바이트 코드를 만드는 그 중간에 스프링이 개입하여 구성정보 클래스의 자식 클래스를 임의로 만들었다는 것이다. -> 이것이 싱글톤을 보장하도록 해준다.
+
+* 우리가 만들었던 AppConfig 코드에는 없지만, AppConfig를 상속받은 코드 AppConfig@CGLIB에는 다음과 같은 코드가 있을 것으로 예상된다.
+
+  ```java
+  @Bean
+   public MemberRepository memberRepository() {
+    if (memoryMemberRepository가 이미 스프링 컨테이너에 등록되어 있으면?) { return 스프링 컨테이너에서 찾아서 반환;
+    } else { //스프링 컨테이너에 없으면
+    기존 로직을 호출해서 MemoryMemberRepository를 생성하고 스프링 컨테이너에 등록 return 반환
+    }
+  }
+  ```
+
+  * 즉, 우리가 만든 코드에 싱글톤이 보장될 수 있도록 추가적인 코드가 작성된 클래스를 빈에 등록했다고 생각할 수 있다.
+
+> 정리하자면,
+>
+> 1. @Configuration을 통해서 스프링이 AppConfig의 자식 클래스를 스프링 빈으로 등록
+> 2. 이 때, AppConfig의 내용이 싱글톤을 보장할 수 있도록 코드를 수정 및 추가함
+> 3. 다른 빈이 추가 될 때, 싱글톤이 유지된 채로 추가됨
+
+* @Configuration을 삭제하게 되면 싱글톤이 깨지게 된다.
+
 
 
 ### 컴포넌트 스캔
